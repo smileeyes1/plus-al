@@ -1,34 +1,29 @@
-<!DOCTYPE html><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>مغامرة الحكيم نور 🧙‍♂️</title>
+<title>مغامرة الجمع الذكية - الحكيم نور 🧙‍♂️</title>
 <style>
 body{margin:0;font-family:Tahoma;background:linear-gradient(#a0e7ff,#b4f8c8);display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;}
 #welcome,#lesson,#game{width:700px;max-width:95%;background:rgba(255,255,255,0.95);padding:25px;border-radius:20px;text-align:center;position:relative;}
 input{font-size:22px;width:200px;padding:8px;border-radius:10px;border:1px solid #ccc;text-align:center;margin:5px;}
 button{padding:10px 20px;margin:5px;border:none;border-radius:12px;background:#ffd166;cursor:pointer;font-size:16px;}
 .character{font-size:70px;transition:0.3s;}
-.jump{transform:translateY(-20px) rotate(-15deg);}
-.star{position:absolute;font-size:20px;animation:boom 1s forwards;}
-@keyframes boom{to{transform:translate(var(--x),var(--y)) scale(0);opacity:0}}
 .item{font-size:50px;margin:5px;}
 .number{font-size:36px;font-weight:bold;color:#ff6b6b;margin:5px;}
 </style>
 </head>
 <body>
 
-<!-- شاشة الترحيب -->
 <div id="welcome">
 <h2>مرحباً بك في مغامرة الحكيم نور 🧙‍♂️!</h2>
-<p>أدخل اسم الطفل واسم ولي الأمر لنبدأ التعلم:</p>
+<p>أدخل اسمك واسم ولي أمرك لنبدأ التعلم:</p>
 <input id="studentName" placeholder="اسم الطفل"><br>
 <input id="parentName" placeholder="اسم ولي الأمر"><br>
 <button onclick="startLesson()">ابدأ التعلم 🎓</button>
 </div>
 
-<!-- المرحلة التعليمية -->
 <div id="lesson" style="display:none;">
 <div class="character" id="char">🧙‍♂️</div>
 <h2>تعلم الجمع مع الحكيم نور 🧙‍♂️</h2>
@@ -36,31 +31,31 @@ button{padding:10px 20px;margin:5px;border:none;border-radius:12px;background:#f
 <div id="visual"></div>
 <div id="numbers" class="number"></div>
 <button id="nextBtn" onclick="nextStep()" style="display:none;">التالي ➡️</button>
+<button id="listenBtn" onclick="listenStep()" style="display:none;">استمع للشرح 🔊</button>
 </div>
 
-<!-- اللعبة الرئيسية -->
 <div id="game" style="display:none;">
 <h2>الآن نلعب ونحسب! 🎮</h2>
 <p>⭐ النقاط: <span id="score">٠</span> | 🎚 المستوى: <span id="level">١</span></p>
 <div class="progress"><div class="bar" id="bar" style="height:20px;background:#ffd166;width:0%;border-radius:10px;"></div></div>
 <div class="story" id="gameStory"></div>
 <div class="visual" id="gameVisual"></div>
-<input id="answer" placeholder="اكتب الرقم هنا"><br>
+<input id="answer" placeholder="اكتب الرقم أو أجب صوتياً"><br>
 <button onclick="check()">أجب</button>
-<button onclick="startVoiceAnswer()">🎤 أجب بصوتك</button>
-<button onclick="hint()">تلميح 🌱</button>
-<button onclick="askAI(prompt('اكتب سؤالك يا صغيري'))">🤖 سؤال ذكي</button>
+<button onclick="voiceAnswer()">أجب صوتياً 🎤</button>
+<button onclick="hint()">تلميح</button>
+<button id="aiBtn" onclick="askAI()">اسأل الذكاء الاصطناعي 🤖</button>
+<button id="teacherBtn" onclick="teacherBoost()" style="display:none;">زر المعلم 🌟</button>
 <div id="msg"></div>
 <div id="explain"></div>
-<button id="teacherBtn" style="display:none;" onclick="teacherPraise()">👨‍🏫 تشجيع المعلم</button>
 </div>
 
 <script>
 // عناصر
 const q=id=>document.getElementById(id);
-let student="", parent="", step=0,steps=[],x=0,y=0,correct=0;
+let student="", parent="", step=0, steps=[], failStreak=0, score=0, level=1, progress=0, difficulty=1;
 
-// بيانات المرحلة التعليمية
+// خطوات التعليم
 steps=[
   {text:"مرحباً يا {name}! أنا الحكيم نور 🧙‍♂️ وسأعلمك الجمع اليوم!",items:[]},
   {text:"انظر! لدي تفاحة واحدة 🍎",items:["🍎"]},
@@ -69,7 +64,7 @@ steps=[
   {text:"رائع! أنت فهمت الجمع، الآن هيا لنلعب!",items:[]}
 ];
 
-// بدء المرحلة التعليمية
+// ابدأ التعليم
 function startLesson(){
   student=q("studentName").value.trim()||"طفلي";
   parent=q("parentName").value.trim()||"ولي الأمر";
@@ -85,15 +80,13 @@ function showStep(){
   q("story").innerHTML=s.text.replace("{name}",student);
   q("visual").innerHTML=s.items.map(i=>`<span class="item">${i}</span>`).join("");
   q("numbers").innerHTML=s.numbers ? s.numbers.join(" ") : "";
+  q("nextBtn").style.display= step>0 ? "inline-block" : "none";
+  q("listenBtn").style.display="inline-block";
+}
 
-  // زر التالي يظهر دائماً إلا إذا كانت هذه آخر خطوة قبل اللعبة
-  if(step < steps.length - 1) {
-    q("nextBtn").style.display="inline-block";
-  } else {
-    q("nextBtn").style.display="none";
-  }
-
-  speakAI(s.text.replace("{name}",student));
+// زر الاستماع للشرح
+function listenStep(){
+  speakAI(steps[step].text.replace("{name}",student));
 }
 
 // التالي
@@ -106,19 +99,19 @@ function nextStep(){
   showStep();
 }
 
-// تحويل الأرقام العربية
+// أرقام عربية
 const arabic=n=>n.toString().replace(/\d/g,d=>"٠١٢٣٤٥٦٧٨٩"[d]);
 
-// ---------- الذكاء الصناعي TTS ----------
-async function speakAI(text){
-  let u=new SpeechSynthesisUtterance(text); 
+// TTS
+function speakAI(text){
+  let u=new SpeechSynthesisUtterance(text);
   u.lang="ar-SA"; u.rate=1; u.pitch=1;
   speechSynthesis.speak(u);
 }
 
 // ---------- اللعبة ----------
-let score=0,level=1,progress=0,difficulty=1,wrong=0,hintCount=0,failStreak=0,successStreak=0;
 const items=["🍎","⭐","🍬","🍌"];
+let x=0, y=0, correct=0, wrong=0, hintCount=0;
 
 function startGame(){
   q("lesson").style.display="none";
@@ -146,19 +139,20 @@ function check(){
   if(!/^[0-9٠-٩]+$/.test(v)){q("msg").innerHTML="اكتب رقماً صحيحاً"; speakAI("الرجاء كتابة رقم صحيح"); return;}
   v=parseInt(v.replace(/[٠-٩]/g,d=>"0123456789"[ "٠١٢٣٤٥٦٧٨٩".indexOf(d)] ));
   if(v===correct){
-    score+=10; progress+=20; successStreak++; failStreak=0;
+    score+=10; progress+=20; failStreak=0; wrong=0;
     q("msg").innerHTML=`🌟 أحسنت يا ${student}!`;
     q("explain").innerHTML=`${arabic(x)} + ${arabic(y)} = ${arabic(correct)}`;
     speakAI(`رائع! أحسنت يا ${student}`);
     if(progress>=100){level++;progress=0;difficulty++;q("msg").innerHTML+=`<br>🎉 لقد انتقلت لمستوى جديد!`;}
   } else {
-    wrong++; failStreak++; successStreak=0;
+    wrong++; failStreak++;
     q("msg").innerHTML=`حاول مرة أخرى يا ${student} 🌱`;
     speakAI("لا بأس، جرب مرة أخرى!");
   }
-  if(successStreak>=3 || failStreak>=5) q("teacherBtn").style.display="inline-block"; else q("teacherBtn").style.display="none";
+
+  if(failStreak>=5 || wrong===5) q("teacherBtn").style.display="inline-block";
   update();
-  if(v===correct)setTimeout(newQ,2000);
+  setTimeout(newQ,2000);
 }
 
 function hint(){
@@ -167,244 +161,27 @@ function hint(){
   if(hintCount===2){q("msg").innerHTML="الجمع يعني جمع الأشياء معاً لتعرف الكل"; speakAI("الجمع يعني جمع الأشياء معاً");}
 }
 
-function teacherPraise(){
-  q("msg").innerHTML=`👨‍🏫 ممتاز! ${parent} يشجعك أن تضيف نجمة على دفترك 🌟`;
-  speakAI(`ممتاز! ${parent} يشجعك أن تضيف نجمة على دفترك`);
+function teacherBoost(){
+  speakAI(`${student}، أرى مجهودك! أضف نجمة على دفترك 🌟`);
   q("teacherBtn").style.display="none";
 }
 
-// زر الذكاء الاصطناعي
-async function askAI(question){
-  q("explain").innerHTML="جاري التحليل… 🤖";
-  speakAI("جاري التحليل…");
-  let answer=`هيا يا ${student}, لنرى! الإجابة على سؤالك: ${question} هي ٥ (مثال)`; 
-  q("explain").innerHTML=answer;
-  speakAI(answer);
+function askAI(){
+  let question = prompt("اسأل الذكاء الصناعي عن أي شيء متعلق بالجمع:");
+  if(question) speakAI(`جواب على سؤالك: ${question} ...`); // يمكن ربط AI حقيقي لاحقاً
 }
 
-// إدخال صوتي + طلب كتابة الإجابة بعد ذلك
-function startVoiceAnswer(){
+// --- إجابة صوتية للطفل ---
+function voiceAnswer(){
   const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-  recognition.lang='ar-SA';
+  recognition.lang = "ar-SA";
   recognition.start();
-  recognition.onresult=function(event){
-    let spokenText = event.results[0][0].transcript;
-    q("answer").value = spokenText;
-    q("msg").innerHTML="لقد استمعت لصوتك! الآن أعد كتابة الإجابة في الصندوق لتأكيدها ✍️";
-    speakAI("لقد استمعت لصوتك! الآن أعد كتابة الإجابة في الصندوق لتأكيدها");
-  }
-  recognition.onerror=function(){
-    q("msg").innerHTML="لم أتمكن من فهم الكلام، حاول مرة أخرى";
-    speakAI("لم أتمكن من فهم الكلام، حاول مرة أخرى");
-  }
-}
-
-function update(){
-  q("score").innerHTML=arabic(score);
-  q("level").innerHTML=arabic(level);
-  q("bar").style.width=progress+"%";
-}
-
-document.addEventListener("keydown",e=>{if(e.key==="Enter")check();});
-</script>
-
-</body>
-</html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>مغامرة الحكيم نور 🧙‍♂️</title>
-<style>
-body{margin:0;font-family:Tahoma;background:linear-gradient(#a0e7ff,#b4f8c8);display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;}
-#welcome,#lesson,#game{width:700px;max-width:95%;background:rgba(255,255,255,0.95);padding:25px;border-radius:20px;text-align:center;position:relative;}
-input{font-size:22px;width:200px;padding:8px;border-radius:10px;border:1px solid #ccc;text-align:center;margin:5px;}
-button{padding:10px 20px;margin:5px;border:none;border-radius:12px;background:#ffd166;cursor:pointer;font-size:16px;}
-.character{font-size:70px;transition:0.3s;}
-.jump{transform:translateY(-20px) rotate(-15deg);}
-.star{position:absolute;font-size:20px;animation:boom 1s forwards;}
-@keyframes boom{to{transform:translate(var(--x),var(--y)) scale(0);opacity:0}}
-.item{font-size:50px;margin:5px;}
-.number{font-size:36px;font-weight:bold;color:#ff6b6b;margin:5px;}
-</style>
-</head>
-<body>
-
-<!-- شاشة الترحيب -->
-<div id="welcome">
-<h2>مرحباً بك في مغامرة الحكيم نور 🧙‍♂️!</h2>
-<p>أدخل اسم الطفل واسم ولي الأمر لنبدأ التعلم:</p>
-<input id="studentName" placeholder="اسم الطفل"><br>
-<input id="parentName" placeholder="اسم ولي الأمر"><br>
-<button onclick="startLesson()">ابدأ التعلم 🎓</button>
-</div>
-
-<!-- المرحلة التعليمية -->
-<div id="lesson" style="display:none;">
-<div class="character" id="char">🧙‍♂️</div>
-<h2>تعلم الجمع مع الحكيم نور 🧙‍♂️</h2>
-<div id="story" class="item"></div>
-<div id="visual"></div>
-<div id="numbers" class="number"></div>
-<button id="nextBtn" onclick="nextStep()" style="display:none;">التالي ➡️</button>
-</div>
-
-<!-- اللعبة الرئيسية -->
-<div id="game" style="display:none;">
-<h2>الآن نلعب ونحسب! 🎮</h2>
-<p>⭐ النقاط: <span id="score">٠</span> | 🎚 المستوى: <span id="level">١</span></p>
-<div class="progress"><div class="bar" id="bar" style="height:20px;background:#ffd166;width:0%;border-radius:10px;"></div></div>
-<div class="story" id="gameStory"></div>
-<div class="visual" id="gameVisual"></div>
-<input id="answer" placeholder="اكتب الرقم هنا"><br>
-<button onclick="check()">أجب</button>
-<button onclick="startVoiceAnswer()">🎤 أجب بصوتك</button>
-<button onclick="hint()">تلميح 🌱</button>
-<button onclick="askAI(prompt('اكتب سؤالك يا صغيري'))">🤖 سؤال ذكي</button>
-<div id="msg"></div>
-<div id="explain"></div>
-<button id="teacherBtn" style="display:none;" onclick="teacherPraise()">👨‍🏫 تشجيع المعلم</button>
-</div>
-
-<script>
-// عناصر
-const q=id=>document.getElementById(id);
-let student="", parent="", step=0,steps=[],x=0,y=0,correct=0;
-
-// بيانات المرحلة التعليمية
-steps=[
-  {text:"مرحباً يا {name}! أنا الحكيم نور 🧙‍♂️ وسأعلمك الجمع اليوم!",items:[]},
-  {text:"انظر! لدي تفاحة واحدة 🍎",items:["🍎"]},
-  {text:"الآن أضفت تفاحة أخرى 🍎، كم أصبح معي؟",items:["🍎","🍎"]},
-  {text:"دعنا نعدها معاً: واحد… اثنان!",items:["🍎","🍎"],numbers:["١","٢"]},
-  {text:"رائع! أنت فهمت الجمع، الآن هيا لنلعب!",items:[]}
-];
-
-// بدء المرحلة التعليمية
-function startLesson(){
-  student=q("studentName").value.trim()||"طفلي";
-  parent=q("parentName").value.trim()||"ولي الأمر";
-  q("welcome").style.display="none";
-  q("lesson").style.display="block";
-  step=0;
-  showStep();
-}
-
-// عرض خطوة
-function showStep(){
-  let s=steps[step];
-  q("story").innerHTML=s.text.replace("{name}",student);
-  q("visual").innerHTML=s.items.map(i=>`<span class="item">${i}</span>`).join("");
-  q("numbers").innerHTML=s.numbers ? s.numbers.join(" ") : "";
-  if(step>0) q("nextBtn").style.display="inline-block"; else q("nextBtn").style.display="none";
-  speakAI(s.text.replace("{name}",student));
-}
-
-// التالي
-function nextStep(){
-  step++;
-  if(step>=steps.length){
-    startGame();
-    return;
-  }
-  showStep();
-}
-
-// تحويل الأرقام العربية
-const arabic=n=>n.toString().replace(/\d/g,d=>"٠١٢٣٤٥٦٧٨٩"[d]);
-
-// ---------- الذكاء الصناعي TTS ----------
-async function speakAI(text){
-  // مثال محاكي، تحتاج مفتاح OpenAI حقيقي
-  // يمكن استبدال fetch بال API الحقيقي TTS
-  console.log("AI TTS:", text); // للتجربة
-  let u=new SpeechSynthesisUtterance(text); 
-  u.lang="ar-SA"; u.rate=1; u.pitch=1;
-  speechSynthesis.speak(u);
-}
-
-// ---------- اللعبة ----------
-let score=0,level=1,progress=0,difficulty=1,wrong=0,hintCount=0,failStreak=0,successStreak=0;
-const items=["🍎","⭐","🍬","🍌"];
-
-function startGame(){
-  q("lesson").style.display="none";
-  q("game").style.display="block";
-  newQ();
-  update();
-}
-
-function newQ(){
-  x=Math.floor(Math.random()*5)+1;
-  y=Math.floor(Math.random()*(Math.min(10-x,difficulty*2)))+1;
-  correct=x+y;
-  let item=items[Math.floor(Math.random()*items.length)];
-  q("gameStory").innerHTML=`${student}، لديك ${arabic(x)} ${item} ثم أضفت ${arabic(y)} أخرى. كم مجموعها؟`;
-  q("gameVisual").innerHTML=item.repeat(x)+" + "+item.repeat(y);
-  q("answer").value="";
-  q("msg").innerHTML="";
-  q("explain").innerHTML="";
-  hintCount=0;
-}
-
-function check(){
-  let v=q("answer").value.trim();
-  if(!v){q("msg").innerHTML=`اكتب الرقم يا ${student}!`; speakAI("اكتب الرقم من فضلك"); return;}
-  if(!/^[0-9٠-٩]+$/.test(v)){q("msg").innerHTML="اكتب رقماً صحيحاً"; speakAI("الرجاء كتابة رقم صحيح"); return;}
-  v=parseInt(v.replace(/[٠-٩]/g,d=>"0123456789"[ "٠١٢٣٤٥٦٧٨٩".indexOf(d)] ));
-  if(v===correct){
-    score+=10; progress+=20; successStreak++; failStreak=0;
-    q("msg").innerHTML=`🌟 أحسنت يا ${student}!`;
-    q("explain").innerHTML=`${arabic(x)} + ${arabic(y)} = ${arabic(correct)}`;
-    speakAI(`رائع! أحسنت يا ${student}`);
-    if(progress>=100){level++;progress=0;difficulty++;q("msg").innerHTML+=`<br>🎉 لقد انتقلت لمستوى جديد!`;}
-  } else {
-    wrong++; failStreak++; successStreak=0;
-    q("msg").innerHTML=`حاول مرة أخرى يا ${student} 🌱`;
-    speakAI("لا بأس، جرب مرة أخرى!");
-  }
-  // زر المعلم يظهر بعد النجاحات أو الإخفاقات المتتالية
-  if(successStreak>=3 || failStreak>=5) q("teacherBtn").style.display="inline-block"; else q("teacherBtn").style.display="none";
-  update();
-  if(v===correct)setTimeout(newQ,2000);
-}
-
-function hint(){
-  hintCount++;
-  if(hintCount===1){q("msg").innerHTML=`ابدأ بالعد من ${arabic(x)}`; speakAI("ابدأ بالعد من "+arabic(x));}
-  if(hintCount===2){q("msg").innerHTML="الجمع يعني جمع الأشياء معاً لتعرف الكل"; speakAI("الجمع يعني جمع الأشياء معاً");}
-}
-
-function teacherPraise(){
-  q("msg").innerHTML=`👨‍🏫 ممتاز! ${parent} يشجعك أن تضيف نجمة على دفترك 🌟`;
-  speakAI(`ممتاز! ${parent} يشجعك أن تضيف نجمة على دفترك`);
-  q("teacherBtn").style.display="none";
-}
-
-// زر الذكاء الاصطناعي
-async function askAI(question){
-  q("explain").innerHTML="جاري التحليل… 🤖";
-  speakAI("جاري التحليل…");
-  // مثال محاكي، يمكن استخدام API حقيقي
-  let answer=`هيا يا ${student}, لنرى! الإجابة على سؤالك: ${question} هي ٥ (مثال)`; 
-  q("explain").innerHTML=answer;
-  speakAI(answer);
-}
-
-// إدخال صوتي
-function startVoiceAnswer(){
-  const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-  recognition.lang='ar-SA';
-  recognition.start();
-  recognition.onresult=function(event){
-    let spokenText = event.results[0][0].transcript;
-    q("answer").value = spokenText;
+  recognition.onresult = e=>{
+    const text = e.results[0][0].transcript;
+    q("answer").value=text.replace(/\D/g,""); // فقط الأرقام
     check();
-  }
-  recognition.onerror=function(){
-    q("msg").innerHTML="لم أتمكن من فهم الكلام، حاول مرة أخرى";
-    speakAI("لم أتمكن من فهم الكلام، حاول مرة أخرى");
-  }
+  };
+  recognition.onerror = e=>{console.log("خطأ في التعرف على الصوت", e);}
 }
 
 function update(){
