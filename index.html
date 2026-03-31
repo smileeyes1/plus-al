@@ -12,6 +12,8 @@ button{padding:10px 20px;margin:5px;border:none;border-radius:12px;background:#f
 .character{font-size:70px;transition:0.3s;}
 .item{font-size:50px;margin:5px;}
 .number{font-size:36px;font-weight:bold;color:#ff6b6b;margin:5px;}
+.progress{width:100%;background:#eee;border-radius:10px;margin:10px 0;}
+.bar{height:20px;background:#ffd166;width:0%;border-radius:10px;}
 </style>
 </head>
 <body>
@@ -37,7 +39,7 @@ button{padding:10px 20px;margin:5px;border:none;border-radius:12px;background:#f
 <div id="game" style="display:none;">
 <h2>الآن نلعب ونحسب! 🎮</h2>
 <p>⭐ النقاط: <span id="score">٠</span> | 🎚 المستوى: <span id="level">١</span></p>
-<div class="progress"><div class="bar" id="bar" style="height:20px;background:#ffd166;width:0%;border-radius:10px;"></div></div>
+<div class="progress"><div class="bar" id="bar"></div></div>
 <div class="story" id="gameStory"></div>
 <div class="visual" id="gameVisual"></div>
 <input id="answer" placeholder="اكتب الرقم أو أجب صوتياً"><br>
@@ -51,10 +53,9 @@ button{padding:10px 20px;margin:5px;border:none;border-radius:12px;background:#f
 </div>
 
 <script>
+// --- عناصر وبيانات ---
 const q=id=>document.getElementById(id);
 let student="", parent="", step=0, steps=[], failStreak=0, score=0, level=1, progress=0, difficulty=1;
-
-// خطوات تعليمية
 steps=[
   {text:"مرحباً يا {name}! أنا الحكيم نور 🧙‍♂️ وسأعلمك الجمع اليوم!",items:[]},
   {text:"انظر! لدي تفاحة واحدة 🍎",items:["🍎"]},
@@ -63,14 +64,12 @@ steps=[
   {text:"رائع! أنت فهمت الجمع، الآن هيا لنلعب!",items:[]}
 ];
 
-// بدء التعليم
 function startLesson(){
   student=q("studentName").value.trim()||"طفلي";
   parent=q("parentName").value.trim()||"ولي الأمر";
   q("welcome").style.display="none";
   q("lesson").style.display="block";
-  step=0;
-  showStep();
+  step=0; showStep();
 }
 
 function showStep(){
@@ -82,37 +81,21 @@ function showStep(){
   q("listenBtn").style.display="inline-block";
 }
 
-// الاستماع للشرح (باستخدام AI)
 async function listenStep(){
   const prompt = steps[step].text.replace("{name}",student);
-  const res = await fetch("/api/tts",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({text:prompt})
-  });
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  new Audio(url).play();
+  const res = await fetch("/api/tts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:prompt})});
+  const blob = await res.blob(); const url = URL.createObjectURL(blob); new Audio(url).play();
 }
 
-function nextStep(){
-  step++;
-  if(step>=steps.length){startGame(); return;}
-  showStep();
-}
+function nextStep(){ step++; if(step>=steps.length){startGame(); return;} showStep(); }
 
 const arabic=n=>n.toString().replace(/\d/g,d=>"٠١٢٣٤٥٦٧٨٩"[d]);
 
-// ---------- اللعبة ----------
+// --- اللعبة ---
 const items=["🍎","⭐","🍬","🍌"];
 let x=0, y=0, correct=0, wrong=0, hintCount=0;
 
-function startGame(){
-  q("lesson").style.display="none";
-  q("game").style.display="block";
-  newQ();
-  update();
-}
+function startGame(){ q("lesson").style.display="none"; q("game").style.display="block"; newQ(); update(); }
 
 function newQ(){
   x=Math.floor(Math.random()*5)+1;
@@ -121,10 +104,7 @@ function newQ(){
   let item=items[Math.floor(Math.random()*items.length)];
   q("gameStory").innerHTML=`${student}، لديك ${arabic(x)} ${item} ثم أضفت ${arabic(y)} أخرى. كم مجموعها؟`;
   q("gameVisual").innerHTML=item.repeat(x)+" + "+item.repeat(y);
-  q("answer").value="";
-  q("msg").innerHTML="";
-  q("explain").innerHTML="";
-  hintCount=0;
+  q("answer").value=""; q("msg").innerHTML=""; q("explain").innerHTML=""; hintCount=0;
 }
 
 async function check(){
@@ -138,63 +118,33 @@ async function check(){
     q("explain").innerHTML=`${arabic(x)} + ${arabic(y)} = ${arabic(correct)}`;
     await speakAI(`رائع! أحسنت يا ${student}`);
     if(progress>=100){level++;progress=0;difficulty++;q("msg").innerHTML+=`<br>🎉 لقد انتقلت لمستوى جديد!`;}
-  } else {
-    wrong++; failStreak++;
-    q("msg").innerHTML=`حاول مرة أخرى يا ${student} 🌱`;
-    await speakAI("لا بأس، جرب مرة أخرى!");
-  }
-
+  } else { wrong++; failStreak++; q("msg").innerHTML=`حاول مرة أخرى يا ${student} 🌱`; await speakAI("لا بأس، جرب مرة أخرى!"); }
   if(failStreak>=5 || wrong===5) q("teacherBtn").style.display="inline-block";
-  update();
-  setTimeout(newQ,2000);
+  update(); setTimeout(newQ,2000);
 }
 
-function hint(){
-  hintCount++;
-  if(hintCount===1){q("msg").innerHTML=`ابدأ بالعد من ${arabic(x)}`; speakAI("ابدأ بالعد من "+arabic(x));}
-  if(hintCount===2){q("msg").innerHTML="الجمع يعني جمع الأشياء معاً لتعرف الكل"; speakAI("الجمع يعني جمع الأشياء معاً");}
-}
+function hint(){ hintCount++; if(hintCount===1){q("msg").innerHTML=`ابدأ بالعد من ${arabic(x)}`; speakAI("ابدأ بالعد من "+arabic(x)); } if(hintCount===2){q("msg").innerHTML="الجمع يعني جمع الأشياء معاً لتعرف الكل"; speakAI("الجمع يعني جمع الأشياء معاً");} }
 
-function teacherBoost(){speakAI(`${student}، أرى مجهودك! أضف نجمة على دفترك 🌟`); q("teacherBtn").style.display="none";}
+function teacherBoost(){ speakAI(`${student}، أرى مجهودك! أضف نجمة على دفترك 🌟`); q("teacherBtn").style.display="none"; }
 
 async function askAI(){
   let question = prompt("اسأل الذكاء الاصطناعي عن أي شيء متعلق بالجمع:");
   if(question){
-    const res = await fetch("/api/ask",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({question})
-    });
-    const data = await res.json();
-    speakAI(data.answer);
+    const res = await fetch("/api/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question})});
+    const data = await res.json(); speakAI(data.answer);
   }
 }
 
-// --- إجابة صوتية للطفل ---
 function voiceAnswer(){
   const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
   recognition.lang = "ar-SA";
   recognition.start();
-  recognition.onresult = e=>{
-    const text = e.results[0][0].transcript;
-    q("answer").value=text.replace(/\D/g,"");
-    check();
-  };
+  recognition.onresult = e=>{ const text = e.results[0][0].transcript; q("answer").value=text.replace(/\D/g,""); check(); }
 }
 
-function update(){
-  q("score").innerHTML=arabic(score);
-  q("level").innerHTML=arabic(level);
-  q("bar").style.width=progress+"%";
-}
+async function speakAI(text){ const res = await fetch("/api/tts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})}); const blob = await res.blob(); const url = URL.createObjectURL(blob); new Audio(url).play(); }
 
-// TTS عبر AI
-async function speakAI(text){
-  const res = await fetch("/api/tts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  new Audio(url).play();
-}
+function update(){ q("score").innerHTML=arabic(score); q("level").innerHTML=arabic(level); q("bar").style.width=progress+"%"; }
 
 document.addEventListener("keydown",e=>{if(e.key==="Enter")check();});
 </script>
