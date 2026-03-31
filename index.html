@@ -51,11 +51,10 @@ button{padding:10px 20px;margin:5px;border:none;border-radius:12px;background:#f
 </div>
 
 <script>
-// عناصر
 const q=id=>document.getElementById(id);
 let student="", parent="", step=0, steps=[], failStreak=0, score=0, level=1, progress=0, difficulty=1;
 
-// خطوات التعليم
+// خطوات تعليمية
 steps=[
   {text:"مرحباً يا {name}! أنا الحكيم نور 🧙‍♂️ وسأعلمك الجمع اليوم!",items:[]},
   {text:"انظر! لدي تفاحة واحدة 🍎",items:["🍎"]},
@@ -64,7 +63,7 @@ steps=[
   {text:"رائع! أنت فهمت الجمع، الآن هيا لنلعب!",items:[]}
 ];
 
-// ابدأ التعليم
+// بدء التعليم
 function startLesson(){
   student=q("studentName").value.trim()||"طفلي";
   parent=q("parentName").value.trim()||"ولي الأمر";
@@ -74,7 +73,6 @@ function startLesson(){
   showStep();
 }
 
-// عرض خطوة
 function showStep(){
   let s=steps[step];
   q("story").innerHTML=s.text.replace("{name}",student);
@@ -84,30 +82,26 @@ function showStep(){
   q("listenBtn").style.display="inline-block";
 }
 
-// زر الاستماع للشرح
-function listenStep(){
-  speakAI(steps[step].text.replace("{name}",student));
+// الاستماع للشرح (باستخدام AI)
+async function listenStep(){
+  const prompt = steps[step].text.replace("{name}",student);
+  const res = await fetch("/api/tts",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({text:prompt})
+  });
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  new Audio(url).play();
 }
 
-// التالي
 function nextStep(){
   step++;
-  if(step>=steps.length){
-    startGame();
-    return;
-  }
+  if(step>=steps.length){startGame(); return;}
   showStep();
 }
 
-// أرقام عربية
 const arabic=n=>n.toString().replace(/\d/g,d=>"٠١٢٣٤٥٦٧٨٩"[d]);
-
-// TTS
-function speakAI(text){
-  let u=new SpeechSynthesisUtterance(text);
-  u.lang="ar-SA"; u.rate=1; u.pitch=1;
-  speechSynthesis.speak(u);
-}
 
 // ---------- اللعبة ----------
 const items=["🍎","⭐","🍬","🍌"];
@@ -133,21 +127,21 @@ function newQ(){
   hintCount=0;
 }
 
-function check(){
+async function check(){
   let v=q("answer").value.trim();
-  if(!v){q("msg").innerHTML=`اكتب الرقم يا ${student}!`; speakAI("اكتب الرقم من فضلك"); return;}
-  if(!/^[0-9٠-٩]+$/.test(v)){q("msg").innerHTML="اكتب رقماً صحيحاً"; speakAI("الرجاء كتابة رقم صحيح"); return;}
+  if(!v){q("msg").innerHTML=`اكتب الرقم يا ${student}!`; await speakAI("اكتب الرقم من فضلك"); return;}
+  if(!/^[0-9٠-٩]+$/.test(v)){q("msg").innerHTML="اكتب رقماً صحيحاً"; await speakAI("الرجاء كتابة رقم صحيح"); return;}
   v=parseInt(v.replace(/[٠-٩]/g,d=>"0123456789"[ "٠١٢٣٤٥٦٧٨٩".indexOf(d)] ));
   if(v===correct){
     score+=10; progress+=20; failStreak=0; wrong=0;
     q("msg").innerHTML=`🌟 أحسنت يا ${student}!`;
     q("explain").innerHTML=`${arabic(x)} + ${arabic(y)} = ${arabic(correct)}`;
-    speakAI(`رائع! أحسنت يا ${student}`);
+    await speakAI(`رائع! أحسنت يا ${student}`);
     if(progress>=100){level++;progress=0;difficulty++;q("msg").innerHTML+=`<br>🎉 لقد انتقلت لمستوى جديد!`;}
   } else {
     wrong++; failStreak++;
     q("msg").innerHTML=`حاول مرة أخرى يا ${student} 🌱`;
-    speakAI("لا بأس، جرب مرة أخرى!");
+    await speakAI("لا بأس، جرب مرة أخرى!");
   }
 
   if(failStreak>=5 || wrong===5) q("teacherBtn").style.display="inline-block";
@@ -161,14 +155,19 @@ function hint(){
   if(hintCount===2){q("msg").innerHTML="الجمع يعني جمع الأشياء معاً لتعرف الكل"; speakAI("الجمع يعني جمع الأشياء معاً");}
 }
 
-function teacherBoost(){
-  speakAI(`${student}، أرى مجهودك! أضف نجمة على دفترك 🌟`);
-  q("teacherBtn").style.display="none";
-}
+function teacherBoost(){speakAI(`${student}، أرى مجهودك! أضف نجمة على دفترك 🌟`); q("teacherBtn").style.display="none";}
 
-function askAI(){
-  let question = prompt("اسأل الذكاء الصناعي عن أي شيء متعلق بالجمع:");
-  if(question) speakAI(`جواب على سؤالك: ${question} ...`); // يمكن ربط AI حقيقي لاحقاً
+async function askAI(){
+  let question = prompt("اسأل الذكاء الاصطناعي عن أي شيء متعلق بالجمع:");
+  if(question){
+    const res = await fetch("/api/ask",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({question})
+    });
+    const data = await res.json();
+    speakAI(data.answer);
+  }
 }
 
 // --- إجابة صوتية للطفل ---
@@ -178,16 +177,23 @@ function voiceAnswer(){
   recognition.start();
   recognition.onresult = e=>{
     const text = e.results[0][0].transcript;
-    q("answer").value=text.replace(/\D/g,""); // فقط الأرقام
+    q("answer").value=text.replace(/\D/g,"");
     check();
   };
-  recognition.onerror = e=>{console.log("خطأ في التعرف على الصوت", e);}
 }
 
 function update(){
   q("score").innerHTML=arabic(score);
   q("level").innerHTML=arabic(level);
   q("bar").style.width=progress+"%";
+}
+
+// TTS عبر AI
+async function speakAI(text){
+  const res = await fetch("/api/tts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  new Audio(url).play();
 }
 
 document.addEventListener("keydown",e=>{if(e.key==="Enter")check();});
